@@ -1,33 +1,31 @@
 #!/bin/bash
+# Generate CA and server and client certificate
+# Modified version of https://github.com/grpc/grpc-java/tree/master/examples/example-tls
+
 # Changes these CN's to match your hosts in your environment if needed.
+SERVER_CA_CN=localhost-ca
 SERVER_CN=localhost
 CLIENT_CN=localhost # Used when doing mutual TLS
 
-echo Generate CA key:
-openssl genrsa -passout pass:1111 -des3 -out ca.key 4096
-echo Generate CA certificate:
-# Generates ca.crt which is the trustCertCollectionFile
-openssl req -passin pass:1111 -new -x509 -days 365 -key ca.key -out ca.crt -subj "/CN=${SERVER_CN}"
+echo Generate CA:
+openssl req -x509 -new -newkey rsa:4096 -keyout ca.key -nodes -out ca.pem -days 3650 -subj "/CN=${SERVER_CA_CN}"
+
 echo Generate server key:
-openssl genrsa -passout pass:1111 -des3 -out server.key 4096
-echo Generate server signing request:
-openssl req -passin pass:1111 -new -key server.key -out server.csr -subj "/CN=${SERVER_CN}"
-echo Self-signed server certificate:
-# Generates server.crt which is the certChainFile for the server
-openssl x509 -req -passin pass:1111 -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt 
-echo Remove passphrase from server key:
-openssl rsa -passin pass:1111 -in server.key -out server.key
-echo Generate client key
-openssl genrsa -passout pass:1111 -des3 -out client.key 4096
-echo Generate client signing request:
-openssl req -passin pass:1111 -new -key client.key -out client.csr -subj "/CN=${CLIENT_CN}"
-echo Self-signed client certificate:
-# Generates client.crt which is the clientCertChainFile for the client (need for mutual TLS only)
-openssl x509 -passin pass:1111 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
-echo Remove passphrase from client key:
-openssl rsa -passin pass:1111 -in client.key -out client.key
-echo Converting the private keys to X.509:
-# Generates client.pem which is the clientPrivateKeyFile for the Client (needed for mutual TLS only)
-openssl pkcs8 -topk8 -nocrypt -in client.key -out client.pem
-# Generates server.pem which is the privateKeyFile for the Server
-openssl pkcs8 -topk8 -nocrypt -in server.key -out server.pem
+openssl genrsa -out server.key.rsa 4096
+openssl pkcs8 -topk8 -in server.key.rsa -out server.key -nocrypt
+rm server.key.rsa
+
+echo Generate server certificate:
+openssl req -new -key server.key -out server.csr -subj "/CN=${SERVER_CN}"
+openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out server.pem -days 365
+rm server.csr
+
+echo Generate client key:
+openssl genrsa -out client.key.rsa 4096
+openssl pkcs8 -topk8 -in client.key.rsa -out client.key -nocrypt
+rm client.key.rsa
+
+echo Generate client certificate:
+openssl req -new -key client.key -out client.csr -subj "/CN=${CLIENT_CN}"
+openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out client.pem -days 365
+rm client.csr
