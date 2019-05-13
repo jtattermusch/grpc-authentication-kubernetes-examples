@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: greeter-client-tls
+spec:
+  containers:
+  - name: greeter-client-tls
+    image: gcr.io/grpc-authentication-demo2019/greeter_client:latest
+    volumeMounts:
+    - name: greeter-certs
+      mountPath: "/etc/greetercerts"
+      readOnly: true
+    env:
+    # Resolve backend IP using cluster-internal DNS name of the backend service
+    - name: GREETER_SERVICE_TARGET
+      value: "greeter-server.default.svc.cluster.local:8000"
+    - name: CERTS_PATH
+      value: "/etc/greetercerts"
+    #- name: GRPC_VERBOSITY
+    #  value: "debug"
+    - name: GREETER_CLIENT_SECURITY
+      value: "tls"
+  restartPolicy: Never
+  volumes:
+  - name: greeter-certs
+    secret:
+      secretName: greeter-client-certs

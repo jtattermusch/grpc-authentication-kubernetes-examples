@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: greeter-client-insecure
+spec:
+  containers:
+  - name: greeter-client-insecure
+    image: gcr.io/grpc-authentication-demo2019/greeter_client:latest
+    env:
+    # Resolve backend IP using cluster-internal DNS name of the backend service
+    - name: GREETER_SERVICE_TARGET
+      value: "greeter-server.default.svc.cluster.local:8000"
+    - name: GREETER_CLIENT_SECURITY
+      value: "insecure"
+  restartPolicy: Never
