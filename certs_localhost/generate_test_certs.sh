@@ -3,9 +3,9 @@
 # Modified version of https://github.com/grpc/grpc-java/tree/master/examples/example-tls
 
 # Changes these CN's to match your hosts in your environment if needed.
-SERVER_CA_CN=grpc-authentication-demo2019-ca
-SERVER_CN=greeter-server.default.svc.cluster.local
-CLIENT_CN=greeter-client.default.svc.cluster.local # Used when doing mutual TLS
+SERVER_CA_CN=localhost-ca
+SERVER_CN=localhost
+CLIENT_CN=localhost # Used when doing mutual TLS
 
 echo Generate CA:
 openssl req -x509 -new -newkey rsa:4096 -keyout ca.key -nodes -out ca.pem -days 3650 -subj "/CN=${SERVER_CA_CN}"
