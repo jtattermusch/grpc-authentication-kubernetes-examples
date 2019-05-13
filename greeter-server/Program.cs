@@ -13,9 +13,15 @@
 // limitations under the License.
 
 using System;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Grpc.Core;
 using Helloworld;
+
+using JWT;
+using JWT.Builder;
+using JWT.Algorithms;
 
 namespace GreeterServer
 {
@@ -24,9 +30,56 @@ namespace GreeterServer
         // Server side handler of the SayHello RPC
         public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
         {
-            return Task.FromResult(new HelloReply { Message = "Hello " + request.Name + " (Backend IP: " +  Environment.GetEnvironmentVariable("MY_POD_IP") + ")" });
+            var jwtToken = GetAuthBearerToken(context.RequestHeaders);
+
+            if (jwtToken != null)
+            {
+                try
+                {
+                    var json = new JwtBuilder()
+                        .WithSecret("dffaaf")
+                        .MustVerifySignature()
+                        .Decode(jwtToken);                    
+                    Console.WriteLine(json);
+
+                    // TODO: validate aud, iss, iat, exp, sub, ...
+                }
+                catch (TokenExpiredException)
+                {
+                    Console.WriteLine("Token has expired");
+                }
+                catch (SignatureVerificationException)
+                {
+                    Console.WriteLine("Token has invalid signature");
+                }
+            }
+            
+            // TODO: add note that we would normally use an interceptor
+            Console.WriteLine("JWT token: " + jwtToken);
+         
+            return Task.FromResult(new HelloReply { Message = "Hello " + request.Name + " (" + context.Peer + ")" });
+        }
+
+        private static string GetAuthBearerToken(Metadata requestHeaders)
+        {
+            var authToken = requestHeaders.FirstOrDefault((entry) => entry.Key == "authorization")?.Value;
+
+            if (authToken == null)
+            {
+                return null;
+            }
+
+            var parts = authToken.Split(" ", 2);
+            if (parts.Length == 2 && parts[0] == "Bearer")
+            {
+                return parts[1];
+                
+            }
+            return null;
         }
     }
+
+    
 
     class Program
     {
@@ -34,20 +87,53 @@ namespace GreeterServer
 
         public static void Main(string[] args)
         {
-            // Work around to make round_robin LB policy re-resolve backends periodically and thus pick up newly deployed replicas of the service.
-            // see https://github.com/grpc/proposal/blob/master/A9-server-side-conn-mgt.md
-            var serverArgs = new[] {new ChannelOption("grpc.max_connection_age_ms", 5000), new ChannelOption("grpc.max_connection_age_grace_ms", 3000)};
+            ServerCredentials serverCredentials = null;
+            var securityOption = Environment.GetEnvironmentVariable("GREETER_SERVER_SECURITY");
+            if (securityOption == "insecure")
+            {
+                serverCredentials = ServerCredentials.Insecure;
+            }
+            else if (securityOption == "tls")
+            {
+                serverCredentials = CreateSslServerCredentials(mutualTls: false);
+            }
+            else if (securityOption == "mtls")
+            {
+                serverCredentials = CreateSslServerCredentials(mutualTls: true);
+            }
+            else 
+            {
+                throw new ArgumentException("Illegal security option.");
+            }
+            Console.WriteLine("Starting server with security: " + securityOption);
 
-            Server server = new Server(serverArgs)
+            Server server = new Server()
             {
                 Services = { Greeter.BindService(new GreeterImpl()) },
-                Ports = { new ServerPort("0.0.0.0", Port, ServerCredentials.Insecure) },
+                Ports = { new ServerPort("0.0.0.0", Port, serverCredentials) },
             };
             server.Start();
             Console.WriteLine("Started server on port " + Port);
 
             // wait forever
             server.ShutdownTask.Wait();
+        }
+
+        public static SslServerCredentials CreateSslServerCredentials(bool mutualTls)
+        {
+            var certsPath = Environment.GetEnvironmentVariable("CERTS_PATH");
+            
+            var keyCertPair = new KeyCertificatePair(
+                File.ReadAllText(Path.Combine(certsPath, "server.pem")),
+                File.ReadAllText(Path.Combine(certsPath, "server.key")));
+            
+            if (!mutualTls)
+            {
+                return new SslServerCredentials(new[] { keyCertPair });
+            }
+
+            var caRoots = File.ReadAllText(Path.Combine(certsPath, "ca.pem"));
+            return new SslServerCredentials(new[] { keyCertPair }, caRoots, SslClientCertificateRequestType.RequestAndRequireAndVerify); 
         }
     }
 }

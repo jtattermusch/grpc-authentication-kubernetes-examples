@@ -14,9 +14,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Grpc.Core;
 using Helloworld;
 using System.Threading;
+using JWT;
+using JWT.Builder;
+using JWT.Algorithms;
+
 
 namespace GreeterClient
 {
@@ -24,19 +29,34 @@ namespace GreeterClient
     {
         public static void Greet()
         {
-            var channelOptions = new List<ChannelOption> {};
-            var lbPolicyName = Environment.GetEnvironmentVariable("GREETER_LB_POLICY_NAME");
-            if (!string.IsNullOrEmpty(lbPolicyName))
-            {
-                Console.WriteLine("Will use " + lbPolicyName + " load balancing policy");
-                channelOptions.Add(new ChannelOption("grpc.lb_policy_name", lbPolicyName));
-            }
-
             var channelTarget = Environment.GetEnvironmentVariable("GREETER_SERVICE_TARGET");
             Console.WriteLine("Creating channel with target " + channelTarget);
 
-            // Resolve backend IP using cluster-internal DNS name of the backend service
-            Channel channel = new Channel(channelTarget, ChannelCredentials.Insecure, channelOptions);
+            ChannelCredentials channelCredentials = null;
+            var securityOption = Environment.GetEnvironmentVariable("GREETER_CLIENT_SECURITY");
+            if (securityOption == "insecure")
+            {
+                channelCredentials = ChannelCredentials.Insecure;
+            }
+            else if (securityOption == "tls")
+            {
+                channelCredentials = CreateCredentials(mutualTls: false, useJwt: false);
+            }
+            else if (securityOption == "jwt")
+            {
+                channelCredentials = CreateCredentials(mutualTls: false, useJwt: true);
+            }
+            else if (securityOption == "mtls")
+            {
+                channelCredentials = CreateCredentials(mutualTls: true, useJwt: false);
+            }
+            else 
+            {
+                throw new ArgumentException("Illegal security option.");
+            }
+            Console.WriteLine("Starting client with security: " + securityOption);
+
+            Channel channel = new Channel(channelTarget, channelCredentials);
 
             var client = new Greeter.GreeterClient(channel);
             String user = "you";
@@ -60,6 +80,65 @@ namespace GreeterClient
         public static void Main(string[] args)
         {
             Greet();
+        }
+
+        private static string GenerateJwt()
+        {
+          //  String signedJwt = JWT.create()
+        //.withKeyId(privateKeyId)
+        //.withIssuer("123456-compute@developer.gserviceaccount.com")
+        //.withSubject("123456-compute@developer.gserviceaccount.com")
+        //.withAudience("https://firestore.googleapis.com/google.firestore.v1beta1.Firestore")
+        //.withIssuedAt(new Date(now))
+        //.withExpiresAt(new Date(now + 3600 * 1000L))
+        //.sign(algorithm);
+
+            //var timestamp = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+            var token = new JwtBuilder()
+                .WithAlgorithm(new HMACSHA256Algorithm())
+                // TODO: add a real secret
+                .WithSecret("dffaaf")
+                // TODO: add keyId?
+                // TODO: add iat
+                .AddClaim("exp", DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds())
+                .AddClaim("iss", "demo-service-account@localhost")
+                .AddClaim("sub", "demo-service-account@localhost")
+                .AddClaim("aud", "demoservice1")
+                .Build();
+
+            Console.WriteLine(token);
+            return token;
+        }
+
+        private static ChannelCredentials CreateCredentials(bool mutualTls, bool useJwt)
+        {
+            var certsPath = Environment.GetEnvironmentVariable("CERTS_PATH");
+
+            var caRoots = File.ReadAllText(Path.Combine(certsPath, "ca.pem"));
+            ChannelCredentials channelCredentials;
+            if (!mutualTls)
+            {
+                channelCredentials = new SslCredentials(caRoots);
+            }
+            else
+            {
+                var keyCertPair = new KeyCertificatePair(
+                File.ReadAllText(Path.Combine(certsPath, "client.pem")),
+                File.ReadAllText(Path.Combine(certsPath, "client.key")));
+                channelCredentials = new SslCredentials(caRoots, keyCertPair);
+            }
+    
+            if (useJwt)
+            {
+                var authInterceptor = new AsyncAuthInterceptor(async (context, metadata) =>
+                {
+                    metadata.Add(new Metadata.Entry("authorization", "Bearer " + GenerateJwt()));
+                });
+
+                var metadataCredentials = CallCredentials.FromInterceptor(authInterceptor);
+                channelCredentials = ChannelCredentials.Create(channelCredentials, metadataCredentials); 
+            }
+            return channelCredentials;
         }
     }
 }
