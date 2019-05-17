@@ -26,66 +26,6 @@ using JWT.Algorithms;
 
 namespace GreeterServer
 {
-    class GreeterImpl : Greeter.GreeterBase
-    {
-        // Server side handler of the SayHello RPC
-        public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
-        {
-            var jwtToken = GetAuthBearerToken(context.RequestHeaders);
-
-            string jwtAuthenticatedSubject = null;
-            if (jwtToken != null)
-            {
-                try
-                {
-                    var json = new JwtBuilder()
-                        .WithSecret("GrpcAuthDemoTestOnlySecret12345")
-                        .MustVerifySignature()
-                        .Decode<IDictionary<string, object>>(jwtToken);
-                    
-                    jwtAuthenticatedSubject = json["sub"].ToString();
-
-                    // TODO: validate aud, iss, iat, exp, sub, ...
-                }
-                catch (TokenExpiredException)
-                {
-                    Console.WriteLine("Token has expired");
-                }
-                catch (SignatureVerificationException)
-                {
-                    Console.WriteLine("Token has invalid signature");
-                }
-            }
-            
-            // TODO: add note that we would normally use an interceptor
-            //Console.WriteLine("JWT token: " + jwtToken);
-
-            string authDetails = "authenticated as " + jwtAuthenticatedSubject;
-         
-            return Task.FromResult(new HelloReply { Message = "Hello " + request.Name + " (" + authDetails + ")" });
-        }
-
-        private static string GetAuthBearerToken(Metadata requestHeaders)
-        {
-            var authToken = requestHeaders.FirstOrDefault((entry) => entry.Key == "authorization")?.Value;
-
-            if (authToken == null)
-            {
-                return null;
-            }
-
-            var parts = authToken.Split(" ", 2);
-            if (parts.Length == 2 && parts[0] == "Bearer")
-            {
-                return parts[1];
-                
-            }
-            return null;
-        }
-    }
-
-    
-
     class Program
     {
         const int Port = 8000;

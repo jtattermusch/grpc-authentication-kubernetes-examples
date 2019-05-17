@@ -84,20 +84,18 @@ namespace GreeterClient
         }
 
         // generates a signed JWT token
-        private static string GenerateJwt(string audience)
+        private static string GenerateJwt()
         {
-            long issuedTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            long expiryTimestamp = issuedTimestamp + 3600;  // valid for 1hr 
+            long expiryTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;  // valid for 1hr 
             var token = new JwtBuilder()
                 .WithAlgorithm(new HMACSHA256Algorithm())
                 // secret good for testing only!
                 // TODO: store as kubernetes secret
                 .WithSecret("GrpcAuthDemoTestOnlySecret12345")
-                .AddClaim("iat", issuedTimestamp)
                 .AddClaim("exp", expiryTimestamp)
                 .AddClaim("iss", "demo-jwt-issuer@grpc-auth-demo.localhost")
                 .AddClaim("sub", "demo-jwt-subject@grpc-auth-demo.localhost")
-                .AddClaim("aud", audience)
+                .AddClaim("aud", "helloworld.Greeter")  // request is for greeter service
                 .Build();
             return token;
         }
@@ -124,8 +122,7 @@ namespace GreeterClient
             {
                 var authInterceptor = new AsyncAuthInterceptor(async (context, metadata) =>
                 {
-                    string audience = context.ServiceUrl;
-                    metadata.Add(new Metadata.Entry("authorization", "Bearer " + GenerateJwt(audience)));
+                    metadata.Add(new Metadata.Entry("authorization", "Bearer " + GenerateJwt()));
                 });
 
                 var metadataCredentials = CallCredentials.FromInterceptor(authInterceptor);
