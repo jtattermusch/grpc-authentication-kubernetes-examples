@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -32,15 +33,17 @@ namespace GreeterServer
         {
             var jwtToken = GetAuthBearerToken(context.RequestHeaders);
 
+            string jwtAuthenticatedSubject = null;
             if (jwtToken != null)
             {
                 try
                 {
                     var json = new JwtBuilder()
-                        .WithSecret("dffaaf")
+                        .WithSecret("GrpcAuthDemoTestOnlySecret12345")
                         .MustVerifySignature()
-                        .Decode(jwtToken);                    
-                    Console.WriteLine(json);
+                        .Decode<IDictionary<string, object>>(jwtToken);
+                    
+                    jwtAuthenticatedSubject = json["sub"].ToString();
 
                     // TODO: validate aud, iss, iat, exp, sub, ...
                 }
@@ -55,9 +58,11 @@ namespace GreeterServer
             }
             
             // TODO: add note that we would normally use an interceptor
-            Console.WriteLine("JWT token: " + jwtToken);
+            //Console.WriteLine("JWT token: " + jwtToken);
+
+            string authDetails = "authenticated as " + jwtAuthenticatedSubject;
          
-            return Task.FromResult(new HelloReply { Message = "Hello " + request.Name + " (" + context.Peer + ")" });
+            return Task.FromResult(new HelloReply { Message = "Hello " + request.Name + " (" + authDetails + ")" });
         }
 
         private static string GetAuthBearerToken(Metadata requestHeaders)

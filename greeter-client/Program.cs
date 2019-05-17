@@ -22,7 +22,6 @@ using JWT;
 using JWT.Builder;
 using JWT.Algorithms;
 
-
 namespace GreeterClient
 {
     class Program
@@ -63,7 +62,8 @@ namespace GreeterClient
             
             for (int i = 0; i < 10000; i++)
             {
-                try {
+                try
+                {
                   var reply = client.SayHello(new HelloRequest { Name = user });
                   Console.WriteLine("Greeting: " + reply.Message);
                 } 
@@ -77,36 +77,28 @@ namespace GreeterClient
             channel.ShutdownAsync().Wait();
             Console.WriteLine();
         }
+
         public static void Main(string[] args)
         {
             Greet();
         }
 
-        private static string GenerateJwt()
+        // generates a signed JWT token
+        private static string GenerateJwt(string audience)
         {
-          //  String signedJwt = JWT.create()
-        //.withKeyId(privateKeyId)
-        //.withIssuer("123456-compute@developer.gserviceaccount.com")
-        //.withSubject("123456-compute@developer.gserviceaccount.com")
-        //.withAudience("https://firestore.googleapis.com/google.firestore.v1beta1.Firestore")
-        //.withIssuedAt(new Date(now))
-        //.withExpiresAt(new Date(now + 3600 * 1000L))
-        //.sign(algorithm);
-
-            //var timestamp = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+            long issuedTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long expiryTimestamp = issuedTimestamp + 3600;  // valid for 1hr 
             var token = new JwtBuilder()
                 .WithAlgorithm(new HMACSHA256Algorithm())
-                // TODO: add a real secret
-                .WithSecret("dffaaf")
-                // TODO: add keyId?
-                // TODO: add iat
-                .AddClaim("exp", DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds())
-                .AddClaim("iss", "demo-service-account@localhost")
-                .AddClaim("sub", "demo-service-account@localhost")
-                .AddClaim("aud", "demoservice1")
+                // secret good for testing only!
+                // TODO: store as kubernetes secret
+                .WithSecret("GrpcAuthDemoTestOnlySecret12345")
+                .AddClaim("iat", issuedTimestamp)
+                .AddClaim("exp", expiryTimestamp)
+                .AddClaim("iss", "demo-jwt-issuer@grpc-auth-demo.localhost")
+                .AddClaim("sub", "demo-jwt-subject@grpc-auth-demo.localhost")
+                .AddClaim("aud", audience)
                 .Build();
-
-            Console.WriteLine(token);
             return token;
         }
 
@@ -132,7 +124,8 @@ namespace GreeterClient
             {
                 var authInterceptor = new AsyncAuthInterceptor(async (context, metadata) =>
                 {
-                    metadata.Add(new Metadata.Entry("authorization", "Bearer " + GenerateJwt()));
+                    string audience = context.ServiceUrl;
+                    metadata.Add(new Metadata.Entry("authorization", "Bearer " + GenerateJwt(audience)));
                 });
 
                 var metadataCredentials = CallCredentials.FromInterceptor(authInterceptor);
