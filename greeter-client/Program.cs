@@ -1,4 +1,4 @@
-// Copyright 2015 gRPC authors.
+// Copyright 2019 The gRPC Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,32 +26,29 @@ namespace GreeterClient
 {
     class Program
     {
-        public static void Greet()
+        public static void Main(string[] args)
         {
             var channelTarget = Environment.GetEnvironmentVariable("GREETER_SERVICE_TARGET");
             Console.WriteLine("Creating channel with target " + channelTarget);
 
             ChannelCredentials channelCredentials = null;
             var securityOption = Environment.GetEnvironmentVariable("GREETER_CLIENT_SECURITY");
-            if (securityOption == "insecure")
+            switch (securityOption)
             {
-                channelCredentials = ChannelCredentials.Insecure;
-            }
-            else if (securityOption == "tls")
-            {
-                channelCredentials = CreateCredentials(mutualTls: false, useJwt: false);
-            }
-            else if (securityOption == "jwt")
-            {
-                channelCredentials = CreateCredentials(mutualTls: false, useJwt: true);
-            }
-            else if (securityOption == "mtls")
-            {
-                channelCredentials = CreateCredentials(mutualTls: true, useJwt: false);
-            }
-            else 
-            {
-                throw new ArgumentException("Illegal security option.");
+                case "insecure":
+                    channelCredentials = ChannelCredentials.Insecure;
+                    break;
+                case "tls":
+                    channelCredentials = CreateCredentials(mutualTls: false, useJwt: false);
+                    break;
+                case "jwt":
+                    channelCredentials = CreateCredentials(mutualTls: false, useJwt: true);
+                    break;
+                case "mtls":
+                    channelCredentials = CreateCredentials(mutualTls: true, useJwt: false);
+                    break;
+                default:
+                    throw new ArgumentException("Illegal security option.");
             }
             Console.WriteLine("Starting client with security: " + securityOption);
 
@@ -78,29 +75,7 @@ namespace GreeterClient
             Console.WriteLine();
         }
 
-        public static void Main(string[] args)
-        {
-            Greet();
-        }
-
-        // generates a signed JWT token
-        private static string GenerateJwt()
-        {
-            long expiryTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;  // valid for 1hr 
-            var token = new JwtBuilder()
-                .WithAlgorithm(new HMACSHA256Algorithm())
-                // secret good for testing only!
-                // TODO: store as kubernetes secret
-                .WithSecret("GrpcAuthDemoTestOnlySecret12345")
-                .AddClaim("exp", expiryTimestamp)
-                .AddClaim("iss", "demo-jwt-issuer@grpc-auth-demo.localhost")
-                .AddClaim("sub", "demo-jwt-subject@grpc-auth-demo.localhost")
-                .AddClaim("aud", "helloworld.Greeter")  // request is for greeter service
-                .Build();
-            return token;
-        }
-
-        private static ChannelCredentials CreateCredentials(bool mutualTls, bool useJwt)
+        static ChannelCredentials CreateCredentials(bool mutualTls, bool useJwt)
         {
             var certsPath = Environment.GetEnvironmentVariable("CERTS_PATH");
 
@@ -113,8 +88,8 @@ namespace GreeterClient
             else
             {
                 var keyCertPair = new KeyCertificatePair(
-                File.ReadAllText(Path.Combine(certsPath, "client.pem")),
-                File.ReadAllText(Path.Combine(certsPath, "client.key")));
+                    File.ReadAllText(Path.Combine(certsPath, "client.pem")),
+                    File.ReadAllText(Path.Combine(certsPath, "client.key")));
                 channelCredentials = new SslCredentials(caRoots, keyCertPair);
             }
     
@@ -129,6 +104,22 @@ namespace GreeterClient
                 channelCredentials = ChannelCredentials.Create(channelCredentials, metadataCredentials); 
             }
             return channelCredentials;
+        }
+
+        // generates a signed JWT token
+        static string GenerateJwt()
+        {
+            var token = new JwtBuilder()
+                .WithAlgorithm(new HMACSHA256Algorithm())
+                // secret good for testing only!
+                // normally stored as kubernetes secret, but for simplicity it's hardcoded
+                .WithSecret("GrpcAuthDemoTestOnlySecret12345")
+                .AddClaim("exp", DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600)  // valid for 1hr
+                .AddClaim("iss", "demo-jwt-issuer@grpc-auth-demo.localhost")
+                .AddClaim("sub", "demo-jwt-subject@grpc-auth-demo.localhost")
+                .AddClaim("aud", "helloworld.Greeter")  // request is for greeter service
+                .Build();
+            return token;
         }
     }
 }
