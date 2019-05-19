@@ -34,21 +34,19 @@ namespace GreeterServer
         {
             ServerCredentials serverCredentials = null;
             var securityOption = Environment.GetEnvironmentVariable("GREETER_SERVER_SECURITY");
-            if (securityOption == "insecure")
+            switch (securityOption)
             {
-                serverCredentials = ServerCredentials.Insecure;
-            }
-            else if (securityOption == "tls")
-            {
-                serverCredentials = CreateSslServerCredentials(mutualTls: false);
-            }
-            else if (securityOption == "mtls")
-            {
-                serverCredentials = CreateSslServerCredentials(mutualTls: true);
-            }
-            else 
-            {
-                throw new ArgumentException("Illegal security option.");
+                case "insecure":
+                    serverCredentials = ServerCredentials.Insecure;
+                    break;
+                case "tls":
+                    serverCredentials = CreateSslServerCredentials(mutualTls: false);
+                    break;
+                case "mtls":
+                    serverCredentials = CreateSslServerCredentials(mutualTls: true);
+                    break;
+                default:
+                    throw new ArgumentException("Illegal security option.");
             }
             Console.WriteLine("Starting server with security: " + securityOption);
 
@@ -60,7 +58,6 @@ namespace GreeterServer
             server.Start();
             Console.WriteLine("Started server on port " + Port);
 
-            // wait forever
             server.ShutdownTask.Wait();
         }
 
