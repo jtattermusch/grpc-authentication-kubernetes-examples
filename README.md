@@ -27,7 +27,27 @@ our kubernetes cluster.
 $ kubernetes/docker_build_and_push.sh
 ```
 
-## Example 1: ...
+
+## Example 1: Connect securely using TLS
+
+TODO: add commands to run
+
+
+## Example 2: Authenticate request with a JWT token
+
+TODO: add commands to run
+
+
+## Example 3: Mutual TLS with manually provided certificates
+
+TODO: add commands to run
+
+
+## Example 4: Mutual TLS with istio and automated key rotation 
+
+gRPC client and server are using insecure channels and trust the proxy to perform mutual authentication on their behalf.
+
+TODO: add commands to run
 
 
 ## Contents
