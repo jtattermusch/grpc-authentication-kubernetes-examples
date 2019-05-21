@@ -12,4 +12,5 @@ spec:
       value: "greeter-server.default.svc.cluster.local:8000"
     - name: GREETER_CLIENT_SECURITY
       value: "insecure"
+  serviceAccountName: greeter-sa
   restartPolicy: Never

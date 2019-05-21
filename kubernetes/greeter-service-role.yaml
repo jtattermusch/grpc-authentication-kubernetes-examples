@@ -1,0 +1,20 @@
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: greeter-accessor
+  namespace: default
+spec:
+  rules:
+  - services: ["greeter-server.default.svc.cluster.local"]
+---
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRoleBinding
+metadata:
+  name: greeter-accessor-binding
+  namespace: default
+spec:
+  subjects:
+  - user: "cluster.local/ns/default/sa/greeter-sa"
+  roleRef:
+    kind: ServiceRole
+    name: "greeter-accessor"
