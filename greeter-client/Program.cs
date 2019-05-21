@@ -97,7 +97,8 @@ namespace GreeterClient
             {
                 var authInterceptor = new AsyncAuthInterceptor(async (context, metadata) =>
                 {
-                    metadata.Add(new Metadata.Entry("authorization", "Bearer " + GenerateJwt()));
+                    metadata.Add(
+                        new Metadata.Entry("authorization", "Bearer " + GenerateJwt()));
                 });
 
                 var metadataCredentials = CallCredentials.FromInterceptor(authInterceptor);
@@ -115,8 +116,8 @@ namespace GreeterClient
                 // normally stored as kubernetes secret, but for simplicity it's hardcoded
                 .WithSecret("GrpcAuthDemoTestOnlySecret12345")
                 .AddClaim("exp", DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600)  // valid for 1hr
-                .AddClaim("iss", "demo-jwt-issuer@grpc-auth-demo.localhost")
-                .AddClaim("sub", "demo-jwt-subject@grpc-auth-demo.localhost")
+                .AddClaim("iss", "demo-jwt-issuer@cluster.local")
+                .AddClaim("sub", "demo-jwt-subject@cluster.local")
                 .AddClaim("aud", "helloworld.Greeter")  // request is for greeter service
                 .Build();
             return token;
