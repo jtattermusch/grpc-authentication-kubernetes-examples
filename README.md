@@ -5,9 +5,7 @@ talk.
 
 https://kccnceu19.sched.com/event/MPbC
 
-Talk Slides: TBD
-
-Full talk video: TBD
+Full talk video: https://www.youtube.com/watch?v=_y-lzjdVEf0
 
 
 ## Prework
